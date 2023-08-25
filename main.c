@@ -1,82 +1,69 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
+#include <string.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 
-#define MAX_INPUT_LENGTH 1024
+#define MAX_INPUT_SIZE 1024
 
-/* Function prototype */
-void execute_command(char **args);
-
+/**
+ * main - Simple UNIX command line interpreter
+ *
+ * Return: Always 0.
+ */
 int main(void)
 {
 	char *input = NULL;
 	size_t input_size = 0;
-	ssize_t input_length;
-	char *args[64];
-	int arg_count;
+	ssize_t read_chars;
 
 	while (1)
 	{
 		printf("#cisfun$ ");
+		read_chars = getline(&input, &input_size, stdin);
 
-		input_length = getline(&input, &input_size, stdin);
-
-		if (input_length == -1)
+		if (read_chars == -1)
 		{
-			printf("\n");
-			break; /* Exit loop on EOF (Ctrl+D) */
+			if (feof(stdin))
+			{
+				printf("\n");
+				break; /* End of file (Ctrl+D) */
+			}
+			else
+			{
+				perror("getline");
+				exit(EXIT_FAILURE);
+			}
 		}
 
-		input[input_length - 1] = '\0'; /* Remove newline character */
+		/* Remove newline character from input */
+		input[strcspn(input, "\n")] = '\0';
 
-		arg_count = 0;
-		args[arg_count] = strtok(input, " ");
-		while (args[arg_count] != NULL)
-		{
-			arg_count++;
-			args[arg_count] = strtok(NULL, " ");
-		}
-		args[arg_count] = NULL; /* Set the last argument to NULL */
+		pid_t pid = fork();
 
-		if (strcmp(args[0], "exit") == 0)
+		if (pid == -1)
 		{
-			/* Built-in exit command */
-			break;
+			perror("fork");
+			exit(EXIT_FAILURE);
 		}
 
-		execute_command(args);
+		if (pid == 0) /* Child process */
+		{
+			char *args[] = {input, NULL};
+			if (execve(input, args, NULL) == -1)
+			{
+				perror("execve");
+				exit(EXIT_FAILURE);
+			}
+		}
+		else /* Parent process */
+		{
+			int status;
+			waitpid(pid, &status, 0);
+		}
 	}
 
-	/* Cleanup: free dynamically allocated memory */
 	free(input);
-
-	return 0;
-}
-
-/* Execute the given command with arguments */
-void execute_command(char **args)
-{
-	pid_t pid = fork();
-
-	if (pid < 0)
-	{
-		perror("fork");
-	}
-	else if (pid == 0)
-	{
-		/* Child process */
-		execvp(args[0], args);
-
-		/* If execvp returns, it means the command couldn't be executed */
-		perror(args[0]);
-		exit(EXIT_FAILURE);
-	}
-	else
-	{
-		/* Parent process */
-		waitpid(pid, NULL, 0);
-	}
+	return (EXIT_SUCCESS);
 }
