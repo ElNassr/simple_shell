@@ -7,8 +7,8 @@
 
 #define MAX_INPUT_LENGTH 1024
 
-/* Function prototypes */
-void execute_command(char *command, char **args);
+/* Function prototype */
+void execute_command(char **args);
 
 int main(void)
 {
@@ -47,7 +47,7 @@ int main(void)
 			break;
 		}
 
-		execute_command(args[0], args);
+		execute_command(args);
 	}
 
 	/* Cleanup: free dynamically allocated memory */
@@ -57,7 +57,7 @@ int main(void)
 }
 
 /* Execute the given command with arguments */
-void execute_command(char *command, char **args)
+void execute_command(char **args)
 {
 	pid_t pid = fork();
 
@@ -68,10 +68,10 @@ void execute_command(char *command, char **args)
 	else if (pid == 0)
 	{
 		/* Child process */
-		execvp(command, args);
+		execvp(args[0], args);
 
 		/* If execvp returns, it means the command couldn't be executed */
-		perror(command);
+		perror(args[0]);
 		exit(EXIT_FAILURE);
 	}
 	else
