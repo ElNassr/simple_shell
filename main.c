@@ -39,7 +39,6 @@ int main(void)
 			arg_count++;
 			args[arg_count] = strtok(NULL, " ");
 		}
-		args[arg_count - 1][strlen(args[arg_count - 1]) - 1] = '\0'; /* Remove newline character */
 		args[arg_count] = NULL; /* Set the last argument to NULL */
 
 		if (strcmp(args[0], "exit") == 0)
