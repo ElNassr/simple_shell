@@ -5,23 +5,24 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
-#define MAX_PATH_LENGTH 1024
+#define MAX_INPUT_LENGTH 1024
 
-/**
- * main - Entry point to the program.
- *
- * Return: Always 0 on success.
- */
+/* Function prototypes */
+void execute_command(char *command, char **args);
+
 int main(void)
 {
 	char *input = NULL;
 	size_t input_size = 0;
+	ssize_t input_length;
+	char *args[64];
+	int arg_count;
 
 	while (1)
 	{
 		printf("#cisfun$ ");
 
-		ssize_t input_length = getline(&input, &input_size, stdin);
+		input_length = getline(&input, &input_size, stdin);
 
 		if (input_length == -1)
 		{
@@ -31,15 +32,12 @@ int main(void)
 
 		input[input_length - 1] = '\0'; /* Remove newline character */
 
-		/* Tokenize input into command and arguments */
-		char *args[64]; /* Maximum 64 arguments */
-		int arg_count = 0;
-
-		char *token = strtok(input, " ");
-		while (token != NULL)
+		arg_count = 0;
+		args[arg_count] = strtok(input, " ");
+		while (args[arg_count] != NULL)
 		{
-			args[arg_count++] = token;
-			token = strtok(NULL, " ");
+			arg_count++;
+			args[arg_count] = strtok(NULL, " ");
 		}
 		args[arg_count] = NULL; /* Set the last argument to NULL */
 
@@ -49,59 +47,65 @@ int main(void)
 			break;
 		}
 
-		/* Check if the command exists using the PATH */
-		char *path = getenv("PATH");
-		char *path_copy = strdup(path);
-		char *path_token = strtok(path_copy, ":");
-		int command_exists = 0;
-
-		while (path_token != NULL)
-		{
-			char command_path[MAX_PATH_LENGTH];
-			snprintf(command_path, sizeof(command_path), "%s/%s", path_token, args[0]);
-
-			if (access(command_path, X_OK) == 0)
-			{
-				command_exists = 1;
-				break;
-			}
-
-			path_token = strtok(NULL, ":");
-		}
-
-		free(path_copy);
-
-		if (command_exists)
-		{
-			pid_t pid = fork();
-
-			if (pid < 0)
-			{
-				perror("fork");
-			}
-			else if (pid == 0)
-			{
-				/* Child process */
-				execv(args[0], args);
-
-				/* If execv returns, it means the command couldn't be executed */
-				perror(args[0]);
-				exit(EXIT_FAILURE);
-			}
-			else
-			{
-				/* Parent process */
-				waitpid(pid, NULL, 0);
-			}
-		}
-		else
-		{
-			printf("Command not found: %s\n", args[0]);
-		}
+		execute_command(args[0], args);
 	}
 
 	/* Cleanup: free dynamically allocated memory */
 	free(input);
 
 	return 0;
+}
+
+/* Execute the given command with arguments */
+void execute_command(char *command, char **args)
+{
+	char *path = getenv("PATH");
+	char *path_copy = strdup(path);
+	char *path_token = strtok(path_copy, ":");
+	int command_exists = 0;
+	char command_path[MAX_INPUT_LENGTH];
+	pid_t pid;
+
+	while (path_token != NULL)
+	{
+		snprintf(command_path, sizeof(command_path), "%s/%s", path_token, command);
+
+		if (access(command_path, X_OK) == 0)
+		{
+			command_exists = 1;
+			break;
+		}
+
+		path_token = strtok(NULL, ":");
+	}
+
+	free(path_copy);
+
+	if (command_exists)
+	{
+		pid = fork();
+
+		if (pid < 0)
+		{
+			perror("fork");
+		}
+		else if (pid == 0)
+		{
+			/* Child process */
+			execv(command_path, args);
+
+			/* If execv returns, it means the command couldn't be executed */
+			perror(command);
+			exit(EXIT_FAILURE);
+		}
+		else
+		{
+			/* Parent process */
+			waitpid(pid, NULL, 0);
+		}
+	}
+	else
+	{
+		printf("Command not found: %s\n", command);
+	}
 }
