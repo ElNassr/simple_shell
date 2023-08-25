@@ -39,6 +39,7 @@ int main(void)
 			arg_count++;
 			args[arg_count] = strtok(NULL, " ");
 		}
+		args[arg_count - 1][strlen(args[arg_count - 1]) - 1] = '\0'; /* Remove newline character */
 		args[arg_count] = NULL; /* Set the last argument to NULL */
 
 		if (strcmp(args[0], "exit") == 0)
@@ -59,53 +60,24 @@ int main(void)
 /* Execute the given command with arguments */
 void execute_command(char *command, char **args)
 {
-	char *path = getenv("PATH");
-	char *path_copy = strdup(path);
-	char *path_token = strtok(path_copy, ":");
-	int command_exists = 0;
-	char command_path[MAX_INPUT_LENGTH];
-	pid_t pid;
+	pid_t pid = fork();
 
-	while (path_token != NULL)
+	if (pid < 0)
 	{
-		snprintf(command_path, sizeof(command_path), "%s/%s", path_token, command);
-
-		if (access(command_path, X_OK) == 0)
-		{
-			command_exists = 1;
-			break;
-		}
-
-		path_token = strtok(NULL, ":");
+		perror("fork");
 	}
-
-	free(path_copy);
-
-	if (command_exists)
+	else if (pid == 0)
 	{
-		pid = fork();
+		/* Child process */
+		execvp(command, args);
 
-		if (pid < 0)
-		{
-			perror("fork");
-		}
-		else if (pid == 0)
-		{
-			/* Child process */
-			execv(command_path, args);
-
-			/* If execv returns, it means the command couldn't be executed */
-			perror(command);
-			exit(EXIT_FAILURE);
-		}
-		else
-		{
-			/* Parent process */
-			waitpid(pid, NULL, 0);
-		}
+		/* If execvp returns, it means the command couldn't be executed */
+		perror(command);
+		exit(EXIT_FAILURE);
 	}
 	else
 	{
-		printf("Command not found: %s\n", command);
+		/* Parent process */
+		waitpid(pid, NULL, 0);
 	}
 }
